@@ -1,24 +1,21 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { Redirect, Stack, usePathname } from 'expo-router';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLoginStoreData } from '@/stores/loginStoreData';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+export default function Layout() {
+  const isAuthenticated = useLoginStoreData((s) => s.isAuthenticated);
+  const pathname = usePathname();
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  if (isAuthenticated && pathname === '/login') {
+    return <Redirect href={{ pathname: '/(tabs)' as any }} />;
+  }
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+  const publicRoutes = ['/login', '/'];
+  const isPublicRoute = publicRoutes.includes(pathname);
+
+  if (!isAuthenticated && !isPublicRoute) {
+    return <Redirect href={{ pathname: '/login' as any }} />;
+  }
+
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

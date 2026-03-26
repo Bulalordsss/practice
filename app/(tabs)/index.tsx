@@ -1,98 +1,201 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { ThemedText } from '@/components/templateComponents/themed-text';
+import { ThemedView } from '@/components/templateComponents/themed-view';
+import { useGetTodoList } from '@/hooks/getTodoList';
+import { useLoginStoreData } from '@/stores/loginStoreData';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const user = useLoginStoreData((s) => s.user);
+  const {
+    todoList,
+    totalCount,
+    isLoading,
+    isRefreshing,
+    error,
+    hasLoaded,
+    getTodoList,
+    refreshTodoList,
+  } = useGetTodoList();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  useEffect(() => {
+    if (!hasLoaded) {
+      void getTodoList();
+    }
+  }, [getTodoList, hasLoaded]);
+
+  const recentActivities = todoList.slice(0, 5);
+  const pendingCount = todoList.filter((item) => !item.completed).length;
+  const completedCount = todoList.filter((item) => item.completed).length;
+  const avatarLabel = user?.username?.charAt(0).toUpperCase() || 'G';
+
+  return (
+    <ThemedView style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: Math.max(insets.top, 16) + 12,
+            paddingBottom: Math.max(insets.bottom, 20) + 92,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={() => void refreshTodoList()} />
+        }
+      >
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <ThemedText type="defaultSemiBold" style={styles.avatarText}>
+              {avatarLabel}
+            </ThemedText>
+          </View>
+
+          <View style={styles.headerText}>
+            <ThemedText style={styles.kicker}>Dashboard</ThemedText>
+            <ThemedText type="title">Good day!</ThemedText>
+            <ThemedText style={styles.subtext}>
+              {user?.username ? `Welcome back, ${user.username}.` : 'Here is your task overview.'}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.summaryRow}>
+          <Card
+            title="To-Do"
+            subtitle="Pending activities waiting for action"
+            style={styles.summaryCard}
+          >
+            <ThemedText type="title">{pendingCount}</ThemedText>
+          </Card>
+
+          <Card
+            title="Complete"
+            subtitle="Activities that are already done"
+            style={styles.summaryCard}
+          >
+            <ThemedText type="title">{completedCount}</ThemedText>
+          </Card>
+        </View>
+
+        <Card title="Recent Activities" subtitle="Latest items from your to-do list">
+          <ThemedText style={styles.paginationText}>
+            Showing {todoList.length} of {totalCount || todoList.length} activities
+          </ThemedText>
+
+          {isLoading ? <ThemedText>Loading activities...</ThemedText> : null}
+          {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
+
+          {!isLoading && !error && recentActivities.length === 0 ? (
+            <ThemedText>No activities available yet.</ThemedText>
+          ) : null}
+
+          {!isLoading && !error
+            ? recentActivities.map((item) => (
+                <View key={item.id} style={styles.activityRow}>
+                  <View style={[styles.statusDot, item.completed ? styles.statusDone : styles.statusTodo]} />
+                  <View style={styles.activityCopy}>
+                    <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                      {item.title}
+                    </ThemedText>
+                    <ThemedText style={styles.activityMeta}>
+                      {item.completed ? 'Completed' : 'To-Do'}
+                    </ThemedText>
+                  </View>
+                </View>
+              ))
+            : null}
+
+          <Button title="See All Activities" onPress={() => router.push('/screens/To-Do-List' as any)} />
+        </Card>
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  screen: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 14,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1D4ED8',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+  },
+  headerText: {
+    flex: 1,
+    gap: 2,
+  },
+  kicker: {
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontSize: 12,
+    opacity: 0.65,
+  },
+  subtext: {
+    opacity: 0.72,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  summaryCard: {
+    flex: 1,
+    minHeight: 146,
+    justifyContent: 'space-between',
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    flexShrink: 0,
+  },
+  statusTodo: {
+    backgroundColor: '#F59E0B',
+  },
+  statusDone: {
+    backgroundColor: '#10B981',
+  },
+  activityCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  activityMeta: {
+    opacity: 0.65,
+  },
+  paginationText: {
+    opacity: 0.65,
+  },
+  errorText: {
+    color: '#D12C2C',
   },
 });
